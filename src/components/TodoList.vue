@@ -8,12 +8,80 @@
       placeholder="Add a new Todo"
       @keyup.enter="addTodo"
     />
-    <div v-for="todo in todos" :key="todo.id" class="todo-item">
-      <input type="checkbox" v-model="todo.isComplete" />
-      <div class="todo-title" :class="{ completed: todo.isComplete }">
-        {{ todo.title }}
+    <transition-group
+      name="fade"
+      enter-active-class="animated fadeInUp"
+      leave-active-class="animated fadeOutDown"
+    >
+      <div v-for="todo in filteredTodos" :key="todo.id" class="todo-item">
+        <input type="checkbox" v-model="todo.isComplete" />
+        <div>
+          <input
+            type="text"
+            class="todo-edit"
+            v-model="todo.title"
+            v-if="todo.isEditable"
+            @blur="toggleEdit(todo)"
+            @keyup.enter="(e) => e.target.blur()"
+            @keyup.escape="restoreTitle(todo)"
+            v-focus
+          />
+          <div
+            class="todo-title"
+            :class="{ completed: todo.isComplete }"
+            v-else
+            @dblclick="toggleEdit(todo)"
+          >
+            {{ todo.title }}
+          </div>
+        </div>
+        <div class="delete-todo" @click="removeTodo(todo.id)">x</div>
       </div>
-      <div class="delete-todo" @click="removeTodo(todo.id)">x</div>
+    </transition-group>
+    <div class="footer">
+      <div>
+        <label for="check-all"
+          ><input type="checkbox" :checked="!anyRemaining" @change="checkAll" />
+          Check All</label
+        >
+      </div>
+      <div>{{ remaining }} items left</div>
+    </div>
+    <div class="filter-section">
+      <button
+        class="button"
+        :class="{ active: filter === 'all' }"
+        @click="filter = 'all'"
+      >
+        All
+      </button>
+      <button
+        class="button"
+        :class="{ active: filter === 'active' }"
+        @click="filter = 'active'"
+      >
+        Active
+      </button>
+      <button
+        class="button"
+        :class="{ active: filter === 'complete' }"
+        @click="filter = 'complete'"
+      >
+        Complete
+      </button>
+      <transition
+        enter-active-class="animated fadeIn"
+        leave-active-class="animated fadeOut"
+      >
+        <button
+          v-if="showClearCompleted"
+          class="button"
+          :style="{ marginLeft: 'auto', marginRight: 0 }"
+          @click="clearCompleted"
+        >
+          Clear Completed
+        </button>
+      </transition>
     </div>
   </div>
 </template>
@@ -25,16 +93,20 @@ export default {
     return {
       newId: 3,
       newTodo: "",
+      titleCache: "",
+      filter: "all",
       todos: [
         {
           id: 1,
           title: "Learn Vue",
           isComplete: false,
+          isEditable: false,
         },
         {
           id: 2,
           title: "Learn Python",
           isComplete: false,
+          isEditable: false,
         },
       ],
     };
@@ -46,17 +118,62 @@ export default {
       }
 
       this.todos.push({
-        id: this.newId,
+        id: this.newId++,
         title: this.newTodo,
         isComplete: false,
       });
 
       this.newTodo = "";
-      this.newId++;
     },
     removeTodo(id) {
-      const newTodos = this.todos.filter((todo) => todo.id !== id);
-      this.todos = newTodos;
+      this.todos = this.todos.filter((todo) => todo.id !== id);
+    },
+    toggleEdit(todo) {
+      todo.isEditable = !todo.isEditable;
+    },
+    restoreTitle(todo) {
+      if (todo.title.trim().length === 0) {
+        return;
+      }
+
+      todo.title = this.titleCache;
+      todo.isEditable = false;
+    },
+    checkAll() {
+      this.todos.forEach((todo) => (todo.isComplete = event.target.checked));
+    },
+    clearCompleted() {
+      this.todos = this.todos.filter((todo) => !todo.isComplete);
+    },
+  },
+  computed: {
+    remaining() {
+      return this.todos.filter((todo) => !todo.isComplete).length;
+    },
+    anyRemaining() {
+      return this.remaining !== 0;
+    },
+    filteredTodos() {
+      if (this.filter === "all") {
+        return this.todos;
+      } else if (this.filter === "active") {
+        return this.todos.filter((todo) => !todo.isComplete);
+      } else if (this.filter === "complete") {
+        return this.todos.filter((todo) => todo.isComplete);
+      } else {
+        return this.todos;
+      }
+    },
+    showClearCompleted() {
+      return this.todos.filter((todo) => todo.isComplete).length;
+    },
+  },
+  directives: {
+    focus: {
+      // directive definition
+      inserted: function(el) {
+        el.focus();
+      },
     },
   },
 };
@@ -79,6 +196,7 @@ export default {
   display: flex;
   align-items: center;
   margin-bottom: 8px;
+  animation-duration: 0.5s;
 }
 
 .todo-title {
@@ -97,5 +215,32 @@ export default {
 .completed {
   color: grey;
   text-decoration: line-through;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid black;
+}
+
+.filter-section {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.button {
+  margin-right: 4px;
+  height: auto;
+  width: auto;
+  padding: 4px 8px;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.active {
+  background-color: green;
 }
 </style>
